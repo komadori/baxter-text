@@ -29,6 +29,7 @@ library
   build-tools: c2hs
   if os(windows) && !flag(UsePango)
     c-sources: cbits/dwrite-impl.cpp
+    extra-libraries: dwrite
   else
       if os(darwin) && !flag(UsePango)
         c-sources: cbits/coretext-impl.m
