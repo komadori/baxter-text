@@ -29,7 +29,7 @@ library
   build-tools: c2hs
   if os(windows) && !flag(UsePango)
     c-sources: cbits/dwrite-impl.cpp
-    cc-options: -std=c++11
+    cc-options: -std=c++11 -DBTCB_WIDE_CHARS
     extra-libraries: dwrite, stdc++
   else
       if os(darwin) && !flag(UsePango)

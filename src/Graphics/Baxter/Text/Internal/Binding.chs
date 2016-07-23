@@ -5,11 +5,13 @@
 module Graphics.Baxter.Text.Internal.Binding where
 
 import Data.Text (Text)
+import Data.Word
 import qualified Data.Text as T
 import qualified Data.Text.Foreign as T
 import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.ForeignPtr
+import Foreign.Marshal.Alloc
 import Foreign.Marshal.Array
 import Foreign.Storable
 
@@ -20,14 +22,18 @@ import Foreign.Storable
 
 deriving instance Storable BTCBString
 
+intSize :: Int
+intSize = sizeOf (0 :: CInt)
+
 withString :: Text -> (BTCBString -> IO a) -> IO a
 #ifdef BTCB_WIDE_CHARS
 withString txt cont =
     let len = T.lengthWord16 txt
-    let off = sizeOf (0 :: CInt)
-    in allocaBytes (off + 2 * len) $ \ptr -> do
+    in allocaBytes (intSize + 2 * len + 2) $ \ptr -> do
         poke (castPtr ptr) (fromIntegral len :: CInt)
-        unsafeCopyToPtr txt (addPtr (castPtr ptr) off)
+        let strPtr = plusPtr (castPtr ptr) intSize
+        T.unsafeCopyToPtr txt strPtr
+        pokeElemOff strPtr len (0 :: Word16)
         cont $ BTCBString ptr
 #else
 withString txt cont = error "Unimplemented"
