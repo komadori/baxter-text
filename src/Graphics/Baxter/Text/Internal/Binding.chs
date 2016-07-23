@@ -4,10 +4,16 @@
 
 module Graphics.Baxter.Text.Internal.Binding where
 
+import Data.Monoid
 import Data.Text (Text)
 import Data.Word
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.Foreign as T
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Builder as BS
+import qualified Data.ByteString.Unsafe as BS
+import qualified Data.ByteString.Lazy as LBS
 import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.ForeignPtr
@@ -36,7 +42,14 @@ withString txt cont =
         pokeElemOff strPtr len (0 :: Word16)
         cont $ BTCBString ptr
 #else
-withString txt cont = error "Unimplemented"
+withString txt cont =
+    let bs = LBS.toStrict $ BS.toLazyByteString $
+             (mconcat $ replicate intSize (BS.word8 0)) <>
+                 T.encodeUtf8Builder txt <> BS.word8 0
+        len = BS.length bs - intSize - 1
+    in BS.unsafeUseAsCString bs $ \ptr -> do
+        poke (castPtr ptr) (fromIntegral len :: CInt)
+        cont $ BTCBString $ castPtr ptr
 #endif
 
 withStringList :: [Text] -> (Ptr BTCBString -> IO a) -> IO a

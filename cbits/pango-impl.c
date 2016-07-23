@@ -16,26 +16,25 @@ struct BTCB_FontDescImpl {
 };
 
 BTCB_FontDesc* btcb_create_font_desc(
-    char** familyPtrs,
-    int* familyLens,
+    BTCB_String** families,
     double size)
 {
     BTCB_FontDesc* fd = calloc(1, sizeof(BTCB_FontDesc));
     fd->pango_fd = pango_font_description_new();
 
-    if (!familyPtrs[0]) {
+    if (!families[0]) {
         // Build a comma-delimited family string
         int familyDelimLen = 0;
-        for (int i=0; familyPtrs[i]; i++) {
-            familyDelimLen += familyLens[i];
+        for (int i=0; families[i]; i++) {
+            familyDelimLen += families[i]->len;
         }
         char familyDelim[familyDelimLen];
         char* familyDelimPtr = familyDelim;
-        for (int i=0; familyPtrs[i]; i++) {
-            int len = familyLens[i];
-            memcpy(familyDelimPtr, familyPtrs[i], len);
+        for (int i=0; families[i]; i++) {
+            int len = families[i]->len;
+            memcpy(familyDelimPtr, families[i]->str, len);
             familyDelimPtr += len;
-            *(familyDelimPtr++) = familyPtrs[i+1] ? ',' : '\0';    
+            *(familyDelimPtr++) = families[i+1] ? ',' : '\0';    
         }
         assert (familyDelimPtr - familyDelim == familyDelimLen);
 

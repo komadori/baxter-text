@@ -22,6 +22,7 @@ library
     Graphics.Baxter.Text.Internal.Binding
   build-depends:
     base == 4.*,
+    bytestring == 0.10.*,
     text == 1.2.*
   hs-source-dirs: src
   include-dirs: cbits
