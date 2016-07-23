@@ -1,28 +1,76 @@
 #include <dwrite.h>
+#include <memory>
 
 #include "btcb.h"
 
+struct COMDeleter {
+    template<typename T> void operator()(T* ptr) {
+        ptr->Release();
+    }
+};
+
+struct BTCB_StringImpl {
+    int len;
+    WCHAR str[];
+};
+
 struct BTCB_FontDescImpl {
-    IDWriteFactory* dwrite_factory;
-    IDWriteTextFormat* dwrite_format;
+    BTCB_FontDescImpl(
+        BTCB_String** families,
+        double size)
+    {
+        HRESULT hr;
+
+        IDWriteFactory* factory;
+        hr = DWriteCreateFactory(
+            DWRITE_FACTORY_TYPE_SHARED,
+            __uuidof(IDWriteFactory),
+            reinterpret_cast<IUnknown**>(&factory));
+        mFactory.reset(factory);
+
+        IDWriteFontCollection* fontSet;
+        hr = factory->GetSystemFontCollection(&fontSet, FALSE);
+        mFontSet.reset(fontSet);
+
+        WCHAR* familyName = NULL;
+        for (int i=0; families[i]; i++) {
+            UINT32 fontIndex;
+            BOOL fontExists;
+            fontSet->FindFamilyName(families[i]->str, &fontIndex, &fontExists);
+            if (!fontExists && families[i+1]) {
+                // Try next family name if there are more
+                continue;
+            }
+            familyName = families[i]->str;
+            break;
+        }
+
+        IDWriteTextFormat* format;
+        factory->CreateTextFormat(
+            familyName,
+            fontSet,
+            DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            size,
+            L"en-GB",
+            &format);
+        mFormat.reset(format);
+    }
+
+    std::unique_ptr<IDWriteFactory, COMDeleter> mFactory;
+    std::unique_ptr<IDWriteFontCollection, COMDeleter> mFontSet;
+    std::unique_ptr<IDWriteTextFormat, COMDeleter> mFormat;
 };
 
 BTCB_FontDesc* btcb_create_font_desc(
-    char** familyPtrs,
-    int* familyLens,
+    BTCB_String** families,
     double size)
 {
-    BTCB_FontDesc* fd = (BTCB_FontDesc*)calloc(1, sizeof(BTCB_FontDesc));
-
-    HRESULT hr = DWriteCreateFactory(
-        DWRITE_FACTORY_TYPE_SHARED,
-        __uuidof(IDWriteFactory),
-        reinterpret_cast<IUnknown**>(&fd->dwrite_factory));
-
-    return fd;
+    return new BTCB_FontDesc(families, size);
 }
 
 void btcb_free_font_desc(BTCB_FontDesc* fd)
 {
-    fd->dwrite_factory->Release();
+    delete fd;
 }

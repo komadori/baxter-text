@@ -6,6 +6,11 @@
 
 #include "btcb.h"
 
+struct BTCB_StringImpl {
+    int len;
+    char str[];
+};
+
 struct BTCB_FontDescImpl {
     PangoFontDescription* pango_fd;
 };

@@ -5,12 +5,14 @@
 extern "C" {
 #endif
 
+struct BTCB_StringImpl;
+typedef struct BTCB_StringImpl BTCB_String;
+
 struct BTCB_FontDescImpl;
 typedef struct BTCB_FontDescImpl BTCB_FontDesc;
 
 extern BTCB_FontDesc* btcb_create_font_desc(
-    char** familyptrs,
-    int* familylens,
+    BTCB_String** families,
     double size);
 
 extern void btcb_free_font_desc(
