@@ -18,6 +18,10 @@ extern BTCB_FontDesc* btcb_create_font_desc(
 extern void btcb_free_font_desc(
     BTCB_FontDesc* fd);
 
+extern void btcb_layout_text(
+    BTCB_String* text,
+    BTCB_FontDesc* fd);
+
 #ifdef __cplusplus
 }
 #endif

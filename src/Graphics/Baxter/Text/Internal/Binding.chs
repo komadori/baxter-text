@@ -78,3 +78,8 @@ newFontDesc = fmap BTCBFontDesc . newForeignPtr btcbFreeFontDesc
     {withStringList* `[Text]',
      `Double'} ->
     `BTCBFontDesc' newFontDesc* #}
+
+{#fun btcb_layout_text as ^
+    {withString* `Text',
+     withBTCBFontDesc* `BTCBFontDesc'} ->
+    `()' #}

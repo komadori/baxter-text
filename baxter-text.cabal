@@ -18,6 +18,7 @@ flag UsePango
 library
   exposed-modules:
     Graphics.Baxter.Text.Font
+    Graphics.Baxter.Text.Layout
   other-modules:
     Graphics.Baxter.Text.Internal.Binding
   build-depends:
@@ -37,4 +38,4 @@ library
         c-sources: cbits/coretext-impl.m
       else
         c-sources: cbits/pango-impl.c
-        pkgconfig-depends: pango == 1.*, pangoft2 == 1.*
+        pkgconfig-depends: gobject-2.0 == 2.*, pango == 1.*, pangoft2 == 1.*

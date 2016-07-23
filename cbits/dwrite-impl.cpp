@@ -74,3 +74,9 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
 {
     delete fd;
 }
+
+void btcb_layout_text(
+    BTCB_String* text,
+    BTCB_FontDesc* fd)
+{
+}
