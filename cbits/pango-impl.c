@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -63,8 +63,21 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
     free(fd);
 }
 
+struct BaxterGlyphRunImpl {
+    struct BaxterGlyphRunImpl* next_run;
+    BTCB_FontFace* font_face;
+    int glyph_count;
+    BTCB_Glyph glyphs[];
+};
+typedef struct BaxterGlyphRunImpl BaxterGlyphRun;
+
+#define FROM_BTCB_GLYPH_RUN(x) \
+    ((BaxterGlyphRun*)((char*)x - offsetof(BaxterGlyphRun, glyphs)))
+
 typedef struct {
     PangoRenderer parent_instance;
+
+    BaxterGlyphRun** next_slot;
 } BaxterPangoRenderer;
 
 typedef struct
@@ -78,24 +91,44 @@ static void baxter_pango_renderer_init(BaxterPangoRenderer* rend)
 {
 }
 
-static void baxter_pango_draw_glyph(
-    PangoRenderer* rend,
+static void baxter_pango_draw_glyphs(
+    PangoRenderer* rend_base,
     PangoFont* font,
-    PangoGlyph glyph,
-    double x,
-    double y)
+    PangoGlyphString* glyphs,
+    int base_x,
+    int base_y)
 {
-    printf("(%f, %f) = %d\n", x, y, glyph);
+    BaxterPangoRenderer* rend = (BaxterPangoRenderer*)rend_base;
+
+    BaxterGlyphRun* run = calloc(1,
+        offsetof(BaxterGlyphRun, glyphs) +
+        sizeof(BTCB_Glyph)*glyphs->num_glyphs);
+    *(rend->next_slot) = run;
+    rend->next_slot = &run->next_run;
+
+    run->glyph_count = glyphs->num_glyphs;
+
+    int xpos = 0;
+    for (int i=0; i<glyphs->num_glyphs; i++) {
+        PangoGlyphInfo *glyph = &glyphs->glyphs[i];
+        BTCB_Glyph* glyph_out = &run->glyphs[i];
+        int x = base_x + xpos + glyph->geometry.x_offset;
+        int y = base_y + glyph->geometry.y_offset;
+        glyph_out->glyph = glyph->glyph;
+        glyph_out->x = x / (double)PANGO_SCALE;
+        glyph_out->y = y / (double)PANGO_SCALE;
+        xpos += glyph->geometry.width;
+    }
 }
 
 static void baxter_pango_renderer_class_init(BaxterPangoRendererClass* klass)
 {
     PangoRendererClass* rend_class = PANGO_RENDERER_CLASS(klass);
 
-    rend_class->draw_glyph = &baxter_pango_draw_glyph;
+    rend_class->draw_glyphs = &baxter_pango_draw_glyphs;
 }
 
-void btcb_layout_text(
+BTCB_GlyphRun* btcb_layout_text(
     BTCB_String* text,
     BTCB_FontDesc* fd)
 {
@@ -103,10 +136,36 @@ void btcb_layout_text(
     pango_layout_set_text(layout, text->str, text->len);
     pango_layout_set_font_description(layout, fd->font_desc);
 
+    BaxterGlyphRun* first_run = NULL;
     BaxterPangoRenderer* rend = g_object_new(
         baxter_pango_renderer_get_type(), NULL);
+    rend->next_slot = &first_run;
     pango_renderer_draw_layout((PangoRenderer*)rend, layout, 0, 0);
     g_object_unref(rend);
 
     g_object_unref(layout);
+    return (BTCB_GlyphRun*)first_run->glyphs;
+}
+
+int btcb_get_run_length(
+    BTCB_GlyphRun* run_ext)
+{
+    BaxterGlyphRun* run = FROM_BTCB_GLYPH_RUN(run_ext);
+    return run->glyph_count;
+}
+
+BTCB_GlyphRun* btcb_get_next_run(
+    BTCB_GlyphRun* run_ext)
+{
+    BaxterGlyphRun* run = FROM_BTCB_GLYPH_RUN(run_ext);
+    return run->next_run ? (BTCB_GlyphRun*)run->next_run->glyphs : NULL;
+}
+
+void btcb_free_run(
+    BTCB_GlyphRun* run_ext)
+{
+    if (run_ext) {
+        BaxterGlyphRun* run = FROM_BTCB_GLYPH_RUN(run_ext);
+        free(run);
+    }
 }

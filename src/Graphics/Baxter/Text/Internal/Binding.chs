@@ -4,9 +4,10 @@
 
 module Graphics.Baxter.Text.Internal.Binding where
 
+import Control.Monad
+import Control.Monad.ST
 import Data.Monoid
 import Data.Text (Text)
-import Data.Word
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Foreign as T
@@ -14,6 +15,9 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BS
 import qualified Data.ByteString.Unsafe as BS
 import qualified Data.ByteString.Lazy as LBS
+import Data.Vector.Storable (MVector(MVector), Vector)
+import qualified Data.Vector.Storable as V
+import Data.Word
 import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.ForeignPtr
@@ -79,7 +83,51 @@ newFontDesc = fmap BTCBFontDesc . newForeignPtr btcbFreeFontDesc
      `Double'} ->
     `BTCBFontDesc' newFontDesc* #}
 
+{#pointer *BTCB_GlyphRun as ^ foreign newtype #}
+
+foreign import ccall "btcb.h &btcb_free_run"
+    btcbFreeRun :: FunPtr (Ptr BTCBGlyphRun -> IO ())
+
+newMaybeGlyphRun :: Ptr BTCBGlyphRun -> IO (Maybe BTCBGlyphRun)
+newMaybeGlyphRun ptr =
+    if ptr /= nullPtr
+    then fmap (Just . BTCBGlyphRun) $ newForeignPtr btcbFreeRun ptr
+    else return Nothing
+
+newtype GlyphID = GlyphID {unGlyphID :: CInt} deriving (Eq, Ord, Show)
+
+data GlyphInfo = GlyphInfo {
+    glyphID :: !GlyphID,
+    glyphX  :: !Double,
+    glyphY  :: !Double
+} deriving (Eq, Ord, Show)
+
+instance Storable GlyphInfo where
+    sizeOf _    = {#sizeof BTCB_Glyph #}
+    alignment _ = {#alignof BTCB_Glyph #}
+    peek ptr = GlyphInfo
+        <$> liftM GlyphID    ({#get BTCB_Glyph->glyph #} ptr)
+        <*> liftM realToFrac ({#get BTCB_Glyph->x #} ptr)
+        <*> liftM realToFrac ({#get BTCB_Glyph->y #} ptr)
+    poke ptr glyph = do
+        {#set BTCB_Glyph.glyph #} ptr (unGlyphID $ glyphID glyph)
+        {#set BTCB_Glyph.x #} ptr (realToFrac $ glyphX glyph)
+        {#set BTCB_Glyph.y #} ptr (realToFrac $ glyphY glyph)
+
 {#fun btcb_layout_text as ^
     {withString* `Text',
      withBTCBFontDesc* `BTCBFontDesc'} ->
-    `()' #}
+    `Maybe BTCBGlyphRun' newMaybeGlyphRun* #}
+
+{#fun btcb_get_run_length as ^
+    {withBTCBGlyphRun* `BTCBGlyphRun'} ->
+    `Int' #}
+
+getGlyphRunVector :: BTCBGlyphRun -> IO (Vector GlyphInfo)
+getGlyphRunVector run@(BTCBGlyphRun runPtr) = do
+    len <- btcbGetRunLength run
+    V.unsafeFreeze $ MVector len (castForeignPtr runPtr)
+
+{#fun btcb_get_next_run as ^
+    {withBTCBGlyphRun* `BTCBGlyphRun'} ->
+    `Maybe BTCBGlyphRun' newMaybeGlyphRun* #}

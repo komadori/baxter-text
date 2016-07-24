@@ -75,8 +75,26 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
     delete fd;
 }
 
-void btcb_layout_text(
+BTCB_GlyphRun* btcb_layout_text(
     BTCB_String* text,
     BTCB_FontDesc* fd)
+{
+    return NULL;
+}
+
+int btcb_get_run_length(
+    BTCB_GlyphRun* run)
+{
+    return 0;
+}
+
+BTCB_GlyphRun* btcb_get_next_run(
+    BTCB_GlyphRun* run)
+{
+    return NULL;
+}
+
+void btcb_free_run(
+    BTCB_GlyphRun* run)
 {
 }
