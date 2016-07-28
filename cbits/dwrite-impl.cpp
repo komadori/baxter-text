@@ -1,4 +1,8 @@
+#define VC_EXTRALEAN
+#include <windows.h>
 #include <dwrite.h>
+#include <cassert>
+#include <cstdlib>
 #include <memory>
 
 #include "btcb.h"
@@ -26,10 +30,12 @@ struct BTCB_FontDescImpl {
             DWRITE_FACTORY_TYPE_SHARED,
             __uuidof(IDWriteFactory),
             reinterpret_cast<IUnknown**>(&factory));
+        assert (SUCCEEDED(hr));
         mFactory.reset(factory);
 
         IDWriteFontCollection* fontSet;
         hr = factory->GetSystemFontCollection(&fontSet, FALSE);
+        assert (SUCCEEDED(hr));
         mFontSet.reset(fontSet);
 
         WCHAR* familyName = NULL;
@@ -46,7 +52,7 @@ struct BTCB_FontDescImpl {
         }
 
         IDWriteTextFormat* format;
-        factory->CreateTextFormat(
+        hr = factory->CreateTextFormat(
             familyName,
             fontSet,
             DWRITE_FONT_WEIGHT_NORMAL,
@@ -55,6 +61,7 @@ struct BTCB_FontDescImpl {
             size,
             L"en-GB",
             &format);
+        assert (SUCCEEDED(hr));
         mFormat.reset(format);
     }
 
@@ -75,10 +82,156 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
     delete fd;
 }
 
+class BaxterTextRenderer : public IDWriteTextRenderer
+{
+public:
+    BaxterTextRenderer()
+        : mRefCount(1)
+    {
+    }
+
+    ~BaxterTextRenderer()
+    {
+    }
+
+    IFACEMETHOD(IsPixelSnappingDisabled)(
+        void* clientDrawingContext,
+        BOOL* isDisabled)
+    {
+        *isDisabled = TRUE;
+        return S_OK;
+    }
+
+    IFACEMETHOD(GetCurrentTransform)(
+        void* clientDrawingContext,
+        DWRITE_MATRIX* transform)
+    {
+        transform->m11 = 1;
+        transform->m12 = 0;
+        transform->m21 = 0;
+        transform->m22 = 1;
+        transform->dx = 0;
+        transform->dy = 0;
+        return S_OK;
+    }
+
+    IFACEMETHOD(GetPixelsPerDip)(
+        void* clientDrawingContext,
+        FLOAT* pixelsPerDip)
+    {
+        *pixelsPerDip = 1;
+        return S_OK;
+    }
+
+    IFACEMETHOD(DrawGlyphRun)(
+        void* clientDrawingContext,
+        FLOAT baselineOriginX,
+        FLOAT baselineOriginY,
+        DWRITE_MEASURING_MODE measuringMode,
+        DWRITE_GLYPH_RUN const* glyphRun,
+        DWRITE_GLYPH_RUN_DESCRIPTION const* glyphRunDescription,
+        IUnknown* clientDrawingEffect)
+    {
+        printf("run @ (%f, %f)\n", baselineOriginX, baselineOriginY);
+        float xPos = baselineOriginX;
+        float yPos = baselineOriginY;
+        for (int i=0; i<glyphRun->glyphCount; i++) {
+            float x = xPos + glyphRun->glyphOffsets[i].advanceOffset;
+            float y = yPos - glyphRun->glyphOffsets[i].ascenderOffset;
+            printf("glyph = %d @ (%f, %f)\n", glyphRun->glyphIndices[i], x, y);
+            xPos += glyphRun->glyphAdvances[i];
+        }
+        return S_OK;
+    }
+
+    IFACEMETHOD(DrawUnderline)(
+        void* clientDrawingContext,
+        FLOAT baselineOriginX,
+        FLOAT baselineOriginY,
+        DWRITE_UNDERLINE const* underline,
+        IUnknown* clientDrawingEffect)
+    {
+        return S_OK;
+    }
+
+    IFACEMETHOD(DrawStrikethrough)(
+        void* clientDrawingContext,
+        FLOAT baselineOriginX,
+        FLOAT baselineOriginY,
+        DWRITE_STRIKETHROUGH const* strikethrough,
+        IUnknown* clientDrawingEffect)
+    {
+        return S_OK;
+    }
+
+    IFACEMETHOD(DrawInlineObject)(
+        void* clientDrawingContext,
+        FLOAT originX,
+        FLOAT originY,
+        IDWriteInlineObject* inlineObject,
+        BOOL isSideways,
+        BOOL isRightToLeft,
+        IUnknown* clientDrawingEffect)
+    {
+        return S_OK;
+    }
+
+    IFACEMETHOD_(unsigned long, AddRef)()
+    {
+        return InterlockedIncrement(&mRefCount);
+    }
+
+    IFACEMETHOD_(unsigned long, Release)()
+    {
+        unsigned long count = InterlockedDecrement(&mRefCount);
+        if (count == 0) {
+            delete this;
+        }
+        return count;
+    }
+
+    IFACEMETHOD(QueryInterface)(
+        IID const& riid,
+        void** ppvObject)
+    {
+        if (__uuidof(IDWriteTextRenderer) == riid)
+        {
+            *ppvObject = this;
+        }
+        else if (__uuidof(IUnknown) == riid)
+        {
+            *ppvObject = this;
+        }
+        else {
+            *ppvObject = NULL;
+            return E_FAIL;
+        }
+        AddRef();
+        return S_OK;
+    }
+
+private:
+    unsigned long mRefCount;
+};
+
 BTCB_GlyphRun* btcb_layout_text(
     BTCB_String* text,
     BTCB_FontDesc* fd)
 {
+    IDWriteTextLayout* layout;
+    HRESULT hr = fd->mFactory->CreateTextLayout(
+        text->str,
+        text->len,
+        fd->mFormat.get(),
+        1000.0, 1000.0,
+        &layout);
+    assert (SUCCEEDED(hr));
+    std::unique_ptr<IDWriteTextLayout, COMDeleter> layoutRef(layout);
+
+    std::unique_ptr<BaxterTextRenderer, COMDeleter> rendererRef(
+        new BaxterTextRenderer());
+    layoutRef->Draw(NULL, rendererRef.get(), 0, 0);
+
     return NULL;
 }
 
