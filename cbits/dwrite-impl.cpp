@@ -82,11 +82,32 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
     delete fd;
 }
 
+struct BaxterGlyphRun {
+    BaxterGlyphRun* nextRun;
+    BTCB_FontFace* fontFace;
+    int glyphCount;
+    BTCB_Glyph glyphs[];
+
+    inline BTCB_GlyphRun* toExt() {
+        return reinterpret_cast<BTCB_GlyphRun*>(&glyphs);
+    }
+
+    static inline BaxterGlyphRun* fromExt(BTCB_GlyphRun* runExt) {
+	if (runExt) {
+            return reinterpret_cast<BaxterGlyphRun*>(
+                reinterpret_cast<char*>(runExt) -
+		offsetof(BaxterGlyphRun, glyphs));
+        }
+	return NULL;
+    }
+};
+
 class BaxterTextRenderer : public IDWriteTextRenderer
 {
 public:
-    BaxterTextRenderer()
+    BaxterTextRenderer(BaxterGlyphRun** nextSlot)
         : mRefCount(1)
+	, mNextSlot(nextSlot)
     {
     }
 
@@ -132,13 +153,23 @@ public:
         DWRITE_GLYPH_RUN_DESCRIPTION const* glyphRunDescription,
         IUnknown* clientDrawingEffect)
     {
-        printf("run @ (%f, %f)\n", baselineOriginX, baselineOriginY);
+        BaxterGlyphRun* run = reinterpret_cast<BaxterGlyphRun*>(calloc(1,
+            offsetof(BaxterGlyphRun, glyphs) +
+            sizeof(BTCB_Glyph)*glyphRun->glyphCount));
+        *mNextSlot = run;
+        mNextSlot = &run->nextRun;
+
+        run->glyphCount = glyphRun->glyphCount;
+
         float xPos = baselineOriginX;
         float yPos = baselineOriginY;
         for (int i=0; i<glyphRun->glyphCount; i++) {
+            BTCB_Glyph* glyphOut = &run->glyphs[i];
             float x = xPos + glyphRun->glyphOffsets[i].advanceOffset;
             float y = yPos - glyphRun->glyphOffsets[i].ascenderOffset;
-            printf("glyph = %d @ (%f, %f)\n", glyphRun->glyphIndices[i], x, y);
+            glyphOut->glyph = glyphRun->glyphIndices[i];
+            glyphOut->x = x;
+            glyphOut->y = y;
             xPos += glyphRun->glyphAdvances[i];
         }
         return S_OK;
@@ -212,6 +243,7 @@ public:
 
 private:
     unsigned long mRefCount;
+    BaxterGlyphRun** mNextSlot;
 };
 
 BTCB_GlyphRun* btcb_layout_text(
@@ -228,26 +260,30 @@ BTCB_GlyphRun* btcb_layout_text(
     assert (SUCCEEDED(hr));
     std::unique_ptr<IDWriteTextLayout, COMDeleter> layoutRef(layout);
 
+    BaxterGlyphRun* firstRun = NULL;
     std::unique_ptr<BaxterTextRenderer, COMDeleter> rendererRef(
-        new BaxterTextRenderer());
+        new BaxterTextRenderer(&firstRun));
     layoutRef->Draw(NULL, rendererRef.get(), 0, 0);
 
-    return NULL;
+    return firstRun->toExt();
 }
 
 int btcb_get_run_length(
-    BTCB_GlyphRun* run)
+    BTCB_GlyphRun* runExt)
 {
-    return 0;
+    return BaxterGlyphRun::fromExt(runExt)->glyphCount;
 }
 
 BTCB_GlyphRun* btcb_get_next_run(
-    BTCB_GlyphRun* run)
+    BTCB_GlyphRun* runExt)
 {
-    return NULL;
+    BaxterGlyphRun* run = BaxterGlyphRun::fromExt(runExt);
+    return run->nextRun ? (BTCB_GlyphRun*)run->nextRun->glyphs : NULL;
 }
 
 void btcb_free_run(
-    BTCB_GlyphRun* run)
+    BTCB_GlyphRun* runExt)
 {
+    BaxterGlyphRun* run = BaxterGlyphRun::fromExt(runExt);
+    free(run);
 }
