@@ -94,7 +94,10 @@ newMaybeGlyphRun ptr =
     then fmap (Just . BTCBGlyphRun) $ newForeignPtr btcbFreeRun ptr
     else return Nothing
 
-newtype GlyphID = GlyphID {unGlyphID :: CInt} deriving (Eq, Ord, Show)
+newtype GlyphID = GlyphID CInt deriving (Eq, Ord, Show)
+
+unGlyphID :: GlyphID -> CInt
+unGlyphID (GlyphID i) = i
 
 data GlyphInfo = GlyphInfo {
     glyphID :: !GlyphID,
