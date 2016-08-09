@@ -93,12 +93,12 @@ struct BaxterGlyphRun {
     }
 
     static inline BaxterGlyphRun* fromExt(BTCB_GlyphRun* runExt) {
-	if (runExt) {
+        if (runExt) {
             return reinterpret_cast<BaxterGlyphRun*>(
                 reinterpret_cast<char*>(runExt) -
-		offsetof(BaxterGlyphRun, glyphs));
+                offsetof(BaxterGlyphRun, glyphs));
         }
-	return NULL;
+        return NULL;
     }
 };
 
@@ -107,7 +107,7 @@ class BaxterTextRenderer : public IDWriteTextRenderer
 public:
     BaxterTextRenderer(BaxterGlyphRun** nextSlot)
         : mRefCount(1)
-	, mNextSlot(nextSlot)
+        , mNextSlot(nextSlot)
     {
     }
 
