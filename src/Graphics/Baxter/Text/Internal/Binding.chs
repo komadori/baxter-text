@@ -131,6 +131,18 @@ getGlyphRunVector run@(BTCBGlyphRun runPtr) = do
     len <- btcbGetRunLength run
     V.unsafeFreeze $ MVector len (castForeignPtr runPtr)
 
+{#pointer *BTCB_Font as ^ foreign newtype #}
+
+foreign import ccall "btcb.h &btcb_free_font"
+    btcbFreeFont :: FunPtr (Ptr BTCBFont -> IO ())
+
+newFont :: Ptr BTCBFont -> IO BTCBFont
+newFont = fmap BTCBFont . newForeignPtr btcbFreeFont 
+
+{#fun btcb_get_run_font as ^
+    {withBTCBGlyphRun* `BTCBGlyphRun'} ->
+    `BTCBFont' newFont* #}
+
 {#fun btcb_get_next_run as ^
     {withBTCBGlyphRun* `BTCBGlyphRun'} ->
     `Maybe BTCBGlyphRun' newMaybeGlyphRun* #}

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <glib.h>
 #include <glib-object.h>
 #include <pango/pango.h>
 #include <pango/pangoft2.h>
@@ -14,6 +15,7 @@ struct BTCB_StringImpl {
 };
 
 struct BTCB_FontDescImpl {
+    gint ref_count;
     PangoFontMap* font_map;
     PangoContext* context;
     PangoFontDescription* font_desc;
@@ -25,6 +27,7 @@ BTCB_FontDesc* btcb_create_font_desc(
 {
     BTCB_FontDesc* fd = calloc(1, sizeof(BTCB_FontDesc));
 
+    fd->ref_count = 1;
     fd->font_map = pango_ft2_font_map_new();
     fd->context = pango_font_map_create_context(fd->font_map);
 
@@ -57,15 +60,22 @@ BTCB_FontDesc* btcb_create_font_desc(
 
 void btcb_free_font_desc(BTCB_FontDesc* fd)
 {
-    pango_font_description_free(fd->font_desc);
-    g_object_unref(fd->context);
-    g_object_unref(fd->font_map);
-    free(fd);
+    if (g_atomic_int_dec_and_test(&fd->ref_count)) {
+        pango_font_description_free(fd->font_desc);
+        g_object_unref(fd->context);
+        g_object_unref(fd->font_map);
+        free(fd);
+    }
 }
+
+struct BTCB_FontImpl {
+    BTCB_FontDesc* context;
+    PangoFont* font;
+};
 
 struct BaxterGlyphRunImpl {
     struct BaxterGlyphRunImpl* next_run;
-    BTCB_FontFace* font_face;
+    BTCB_Font* font;
     int glyph_count;
     BTCB_Glyph glyphs[];
 };
@@ -77,6 +87,7 @@ typedef struct BaxterGlyphRunImpl BaxterGlyphRun;
 typedef struct {
     PangoRenderer parent_instance;
 
+    BTCB_FontDesc* context;
     BaxterGlyphRun** next_slot;
 } BaxterPangoRenderer;
 
@@ -105,6 +116,12 @@ static void baxter_pango_draw_glyphs(
         sizeof(BTCB_Glyph)*glyphs->num_glyphs);
     *(rend->next_slot) = run;
     rend->next_slot = &run->next_run;
+
+    g_atomic_int_inc(&rend->context->ref_count);
+    g_object_ref(font);
+    run->font = calloc(1, sizeof(BTCB_Font));
+    run->font->context = rend->context;
+    run->font->font = font;
 
     run->glyph_count = glyphs->num_glyphs;
 
@@ -139,6 +156,7 @@ BTCB_GlyphRun* btcb_layout_text(
     BaxterGlyphRun* first_run = NULL;
     BaxterPangoRenderer* rend = g_object_new(
         baxter_pango_renderer_get_type(), NULL);
+    rend->context = fd;
     rend->next_slot = &first_run;
     pango_renderer_draw_layout((PangoRenderer*)rend, layout, 0, 0);
     g_object_unref(rend);
@@ -159,6 +177,21 @@ BTCB_GlyphRun* btcb_get_next_run(
 {
     BaxterGlyphRun* run = FROM_BTCB_GLYPH_RUN(run_ext);
     return run->next_run ? (BTCB_GlyphRun*)run->next_run->glyphs : NULL;
+}
+
+BTCB_Font* btcb_get_run_font(
+    BTCB_GlyphRun* run_ext)
+{
+    BaxterGlyphRun* run = FROM_BTCB_GLYPH_RUN(run_ext);
+    return run->font;
+}
+
+void btcb_free_font(
+    BTCB_Font* font)
+{
+    g_object_unref(font->font);
+    btcb_free_font_desc(font->context);
+    free(font);
 }
 
 void btcb_free_run(

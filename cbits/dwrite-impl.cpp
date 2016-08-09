@@ -84,7 +84,7 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
 
 struct BaxterGlyphRun {
     BaxterGlyphRun* nextRun;
-    BTCB_FontFace* fontFace;
+    BTCB_Font* font;
     int glyphCount;
     BTCB_Glyph glyphs[];
 
@@ -279,6 +279,18 @@ BTCB_GlyphRun* btcb_get_next_run(
 {
     BaxterGlyphRun* run = BaxterGlyphRun::fromExt(runExt);
     return run->nextRun ? (BTCB_GlyphRun*)run->nextRun->glyphs : NULL;
+}
+
+BTCB_Font* btcb_get_run_font(
+    BTCB_GlyphRun* runExt)
+{
+    BaxterGlyphRun* run = BaxterGlyphRun::fromExt(runExt);
+    return run->font;
+}
+
+void btcb_free_font(
+    BTCB_Font* font)
+{
 }
 
 void btcb_free_run(

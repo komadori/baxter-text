@@ -11,8 +11,8 @@ typedef struct BTCB_StringImpl BTCB_String;
 struct BTCB_FontDescImpl;
 typedef struct BTCB_FontDescImpl BTCB_FontDesc;
 
-struct BTCB_FontFaceImpl;
-typedef struct BTCB_FontFaceImpl BTCB_FontFace;
+struct BTCB_FontImpl;
+typedef struct BTCB_FontImpl BTCB_Font;
 
 typedef struct {
     int glyph;
@@ -39,6 +39,12 @@ extern int btcb_get_run_length(
 
 extern BTCB_GlyphRun* btcb_get_next_run(
     BTCB_GlyphRun* run);
+
+extern BTCB_Font* btcb_get_run_font(
+    BTCB_GlyphRun* run);
+
+extern void btcb_free_font(
+    BTCB_Font* font);
 
 extern void btcb_free_run(
     BTCB_GlyphRun* run);
