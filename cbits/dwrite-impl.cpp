@@ -22,6 +22,7 @@ struct BTCB_FontDescImpl {
     BTCB_FontDescImpl(
         BTCB_String** families,
         double size)
+    : mRefCount(1)
     {
         HRESULT hr;
 
@@ -65,6 +66,17 @@ struct BTCB_FontDescImpl {
         mFormat.reset(format);
     }
 
+    void AddRef() {
+        InterlockedIncrement(&mRefCount);
+    }
+
+    void Release() {
+        if (!InterlockedDecrement(&mRefCount)) {
+            delete this;
+        }
+    }
+
+    unsigned long mRefCount;
     std::unique_ptr<IDWriteFactory, COMDeleter> mFactory;
     std::unique_ptr<IDWriteFontCollection, COMDeleter> mFontSet;
     std::unique_ptr<IDWriteTextFormat, COMDeleter> mFormat;
@@ -79,8 +91,27 @@ BTCB_FontDesc* btcb_create_font_desc(
 
 void btcb_free_font_desc(BTCB_FontDesc* fd)
 {
-    delete fd;
+    fd->Release();
 }
+
+struct BTCB_FontImpl {
+    std::unique_ptr<BTCB_FontDesc, COMDeleter> mContext;
+    std::unique_ptr<IDWriteFontFace, COMDeleter> mFont;
+    double mSize;
+
+    BTCB_FontImpl(BTCB_FontDesc* context, IDWriteFontFace* font, double size)
+        : mContext(context)
+        , mFont(font)
+        , mSize(size)
+    {
+        context->AddRef();
+        font->AddRef();
+    }
+
+    ~BTCB_FontImpl()
+    {
+    }
+};
 
 struct BaxterGlyphRun {
     BaxterGlyphRun* nextRun;
@@ -105,8 +136,9 @@ struct BaxterGlyphRun {
 class BaxterTextRenderer : public IDWriteTextRenderer
 {
 public:
-    BaxterTextRenderer(BaxterGlyphRun** nextSlot)
+    BaxterTextRenderer(BTCB_FontDesc* context, BaxterGlyphRun** nextSlot)
         : mRefCount(1)
+        , mContext(context)
         , mNextSlot(nextSlot)
     {
     }
@@ -159,6 +191,8 @@ public:
         *mNextSlot = run;
         mNextSlot = &run->nextRun;
 
+        run->font = new BTCB_Font(
+            mContext, glyphRun->fontFace, glyphRun->fontEmSize);
         run->glyphCount = glyphRun->glyphCount;
 
         float xPos = baselineOriginX;
@@ -243,6 +277,7 @@ public:
 
 private:
     unsigned long mRefCount;
+    BTCB_FontDesc* mContext;
     BaxterGlyphRun** mNextSlot;
 };
 
@@ -262,7 +297,7 @@ BTCB_GlyphRun* btcb_layout_text(
 
     BaxterGlyphRun* firstRun = NULL;
     std::unique_ptr<BaxterTextRenderer, COMDeleter> rendererRef(
-        new BaxterTextRenderer(&firstRun));
+        new BaxterTextRenderer(fd, &firstRun));
     layoutRef->Draw(NULL, rendererRef.get(), 0, 0);
 
     return firstRun->toExt();
@@ -291,6 +326,7 @@ BTCB_Font* btcb_get_run_font(
 void btcb_free_font(
     BTCB_Font* font)
 {
+    delete font;
 }
 
 void btcb_free_run(
