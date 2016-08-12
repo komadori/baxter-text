@@ -23,6 +23,11 @@ typedef struct {
 struct BTCB_GlyphRunImpl;
 typedef struct BTCB_GlyphRunImpl BTCB_GlyphRun;
 
+typedef struct {
+    double width;
+    double height;
+} BTCB_GlyphMetrics;
+
 extern BTCB_FontDesc* btcb_create_font_desc(
     BTCB_String** families,
     double size);
@@ -42,6 +47,11 @@ extern BTCB_GlyphRun* btcb_get_next_run(
 
 extern BTCB_Font* btcb_get_run_font(
     BTCB_GlyphRun* run);
+
+extern void btcb_get_glyph_metrics(
+    BTCB_Font* font,
+    int glyph,
+    BTCB_GlyphMetrics* out);
 
 extern void btcb_free_font(
     BTCB_Font* font);

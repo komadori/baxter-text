@@ -1,4 +1,15 @@
-module Graphics.Baxter.Text.Layout where
+module Graphics.Baxter.Text.Layout (
+    GlyphID,
+    GlyphInfo(
+        glyphID,
+        glyphX,
+        glyphY),
+    GlyphRun(
+        runFont,
+        runGlyphs),
+    layoutText,
+    getMetrics,
+) where
 
 import Data.Text (Text)
 import Data.Vector.Storable (Vector)
@@ -26,3 +37,7 @@ layoutText txt (FontHandle fd) =
             return $ GlyphRun (Font font) glyphs : rest
         procRun Nothing = return []
     in btcbLayoutText txt fd >>= procRun
+
+getMetrics :: Font -> GlyphID -> IO GlyphMetrics
+getMetrics (Font font) glyph =
+    getMetricsImpl font glyph

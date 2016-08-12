@@ -323,6 +323,15 @@ BTCB_Font* btcb_get_run_font(
     return run->font;
 }
 
+void btcb_get_glyph_metrics(
+    BTCB_Font* font,
+    int glyph,
+    BTCB_GlyphMetrics* out)
+{
+    out->width = 0;
+    out->height = 0;
+}
+
 void btcb_free_font(
     BTCB_Font* font)
 {

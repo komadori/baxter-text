@@ -143,6 +143,33 @@ newFont = fmap BTCBFont . newForeignPtr btcbFreeFont
     {withBTCBGlyphRun* `BTCBGlyphRun'} ->
     `BTCBFont' newFont* #}
 
+data GlyphMetrics = GlyphMetrics {
+    glyphWidth  :: !Double,
+    glyphHeight :: !Double
+} deriving Show
+
+instance Storable GlyphMetrics where
+    sizeOf _    = {#sizeof BTCB_GlyphMetrics #}
+    alignment _ = {#alignof BTCB_GlyphMetrics #}
+    peek ptr = GlyphMetrics
+        <$> liftM realToFrac ({#get BTCB_GlyphMetrics->width  #} ptr)
+        <*> liftM realToFrac ({#get BTCB_GlyphMetrics->height #} ptr)
+    poke ptr val = do
+        {#set BTCB_GlyphMetrics.width  #} ptr (realToFrac $ glyphWidth  val)
+        {#set BTCB_GlyphMetrics.height #} ptr (realToFrac $ glyphHeight val)
+
+{#fun btcb_get_glyph_metrics as ^
+    {withBTCBFont* `BTCBFont',
+     unGlyphID `GlyphID',
+     castPtr `Ptr GlyphMetrics'} ->
+    `()' #}
+
+getMetricsImpl :: BTCBFont -> GlyphID -> IO GlyphMetrics
+getMetricsImpl font glyph =
+    alloca $ \ptr -> do
+        btcbGetGlyphMetrics font glyph ptr
+        peek ptr
+
 {#fun btcb_get_next_run as ^
     {withBTCBGlyphRun* `BTCBGlyphRun'} ->
     `Maybe BTCBGlyphRun' newMaybeGlyphRun* #}

@@ -186,6 +186,31 @@ BTCB_Font* btcb_get_run_font(
     return run->font;
 }
 
+void btcb_get_glyph_metrics(
+    BTCB_Font* font,
+    int glyph,
+    BTCB_GlyphMetrics* out)
+{
+    PangoGlyphInfo ginfo;
+    PangoGlyphString gstr;
+    guint log = 0;
+    ginfo.glyph = glyph;
+    ginfo.geometry.width = 0;
+    ginfo.geometry.x_offset = 0;
+    ginfo.geometry.y_offset = 0;
+    ginfo.attr.is_cluster_start = 1;
+    gstr.num_glyphs = 1;
+    gstr.glyphs = &ginfo;
+    gstr.log_clusters = &log;
+
+    PangoRectangle ink_rect;
+    PangoRectangle logical_rect;
+    pango_glyph_string_extents(&gstr, font->font, &ink_rect, &logical_rect);
+
+    out->width = ink_rect.width / (double)PANGO_SCALE;
+    out->height = ink_rect.height / (double)PANGO_SCALE;
+}
+
 void btcb_free_font(
     BTCB_Font* font)
 {
