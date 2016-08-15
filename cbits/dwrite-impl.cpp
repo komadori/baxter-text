@@ -97,6 +97,7 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
 struct BTCB_FontImpl {
     std::unique_ptr<BTCB_FontDesc, COMDeleter> mContext;
     std::unique_ptr<IDWriteFontFace, COMDeleter> mFont;
+    DWRITE_FONT_METRICS mMetrics;
     double mSize;
 
     BTCB_FontImpl(BTCB_FontDesc* context, IDWriteFontFace* font, double size)
@@ -106,6 +107,7 @@ struct BTCB_FontImpl {
     {
         context->AddRef();
         font->AddRef();
+        font->GetMetrics(&mMetrics);
     }
 
     ~BTCB_FontImpl()
@@ -328,8 +330,17 @@ void btcb_get_glyph_metrics(
     int glyph,
     BTCB_GlyphMetrics* out)
 {
-    out->width = 0;
-    out->height = 0;
+    UINT16 glyphId = static_cast<UINT16>(glyph);
+    DWRITE_GLYPH_METRICS metrics;
+    HRESULT hr = font->mFont->GetDesignGlyphMetrics(
+        &glyphId, 1, &metrics);
+    assert (SUCCEEDED(hr));
+
+    double scale = font->mSize / font->mMetrics.designUnitsPerEm;
+    out->width = (metrics.advanceWidth -
+        metrics.leftSideBearing - metrics.rightSideBearing) * scale;
+    out->height = (metrics.advanceHeight -
+        metrics.topSideBearing - metrics.bottomSideBearing) * scale;
 }
 
 void btcb_free_font(
