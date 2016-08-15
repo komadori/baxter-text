@@ -33,11 +33,11 @@ BTCB_FontDesc* btcb_create_font_desc(
 
     fd->font_desc = pango_font_description_new();
 
-    if (!families[0]) {
+    if (families[0]) {
         // Build a comma-delimited family string
         int familyDelimLen = 0;
         for (int i=0; families[i]; i++) {
-            familyDelimLen += families[i]->len;
+            familyDelimLen += families[i]->len + 1;
         }
         char familyDelim[familyDelimLen];
         char* familyDelimPtr = familyDelim;
