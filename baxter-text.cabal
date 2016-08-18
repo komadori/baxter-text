@@ -39,4 +39,5 @@ library
         c-sources: cbits/coretext-impl.m
       else
         c-sources: cbits/pango-impl.c
-        pkgconfig-depends: gobject-2.0 == 2.*, pango == 1.*, pangoft2 == 1.*
+        pkgconfig-depends:
+            gobject-2.0 == 2.*, pango == 1.*, pangoft2 == 1.*, freetype2

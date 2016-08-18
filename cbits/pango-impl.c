@@ -6,6 +6,8 @@
 #include <glib-object.h>
 #include <pango/pango.h>
 #include <pango/pangoft2.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include "btcb.h"
 
@@ -191,24 +193,12 @@ void btcb_get_glyph_metrics(
     int glyph,
     BTCB_GlyphMetrics* out)
 {
-    PangoGlyphInfo ginfo;
-    PangoGlyphString gstr;
-    guint log = 0;
-    ginfo.glyph = glyph;
-    ginfo.geometry.width = 0;
-    ginfo.geometry.x_offset = 0;
-    ginfo.geometry.y_offset = 0;
-    ginfo.attr.is_cluster_start = 1;
-    gstr.num_glyphs = 1;
-    gstr.glyphs = &ginfo;
-    gstr.log_clusters = &log;
-
-    PangoRectangle ink_rect;
-    PangoRectangle logical_rect;
-    pango_glyph_string_extents(&gstr, font->font, &ink_rect, &logical_rect);
-
-    out->width = ink_rect.width / (double)PANGO_SCALE;
-    out->height = ink_rect.height / (double)PANGO_SCALE;
+    FT_Face face = pango_fc_font_lock_face((PangoFcFont*)font->font);
+    FT_Load_Glyph(face, glyph, FT_LOAD_NO_SCALE);
+    double scale = face->size->metrics.x_ppem / (double)face->units_per_EM;
+    out->width = face->glyph->metrics.width * scale;
+    out->height = face->glyph->metrics.height * scale;
+    pango_fc_font_unlock_face((PangoFcFont*)font->font);
 }
 
 void btcb_free_font(
