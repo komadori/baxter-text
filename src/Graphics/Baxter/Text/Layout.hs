@@ -17,13 +17,13 @@ import Data.Vector.Storable (Vector)
 import Graphics.Baxter.Text.Internal.Binding
 import Graphics.Baxter.Text.Font
 
-newtype Font = Font BTCBFont
+newtype GlyphFont = GlyphFont BTCBGlyphFont
 
-instance Show Font where
-    showsPrec _ (Font _) = showString "Font"
+instance Show GlyphFont where
+    showsPrec _ (GlyphFont _) = showString "Font"
 
 data GlyphRun = GlyphRun {
-    runFont   :: Font,
+    runFont   :: GlyphFont,
     runGlyphs :: Vector GlyphInfo
 } deriving Show
 
@@ -34,10 +34,10 @@ layoutText txt (FontHandle fd) =
             font <- btcbGetRunFont run
             nextRun <- btcbGetNextRun run
             rest <- procRun nextRun
-            return $ GlyphRun (Font font) glyphs : rest
+            return $ GlyphRun (GlyphFont font) glyphs : rest
         procRun Nothing = return []
     in btcbLayoutText txt fd >>= procRun
 
-getMetrics :: Font -> GlyphID -> IO GlyphMetrics
-getMetrics (Font font) glyph =
+getMetrics :: GlyphFont -> GlyphID -> IO GlyphMetrics
+getMetrics (GlyphFont font) glyph =
     getMetricsImpl font glyph

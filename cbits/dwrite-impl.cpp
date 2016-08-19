@@ -94,13 +94,14 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
     fd->Release();
 }
 
-struct BTCB_FontImpl {
+struct BTCB_GlyphFontImpl {
     std::unique_ptr<BTCB_FontDesc, COMDeleter> mContext;
     std::unique_ptr<IDWriteFontFace, COMDeleter> mFont;
     DWRITE_FONT_METRICS mMetrics;
     double mSize;
 
-    BTCB_FontImpl(BTCB_FontDesc* context, IDWriteFontFace* font, double size)
+    BTCB_GlyphFontImpl(
+        BTCB_FontDesc* context, IDWriteFontFace* font, double size)
         : mContext(context)
         , mFont(font)
         , mSize(size)
@@ -110,14 +111,14 @@ struct BTCB_FontImpl {
         font->GetMetrics(&mMetrics);
     }
 
-    ~BTCB_FontImpl()
+    ~BTCB_GlyphFontImpl()
     {
     }
 };
 
 struct BaxterGlyphRun {
     BaxterGlyphRun* nextRun;
-    BTCB_Font* font;
+    BTCB_GlyphFont* font;
     int glyphCount;
     BTCB_Glyph glyphs[];
 
@@ -193,7 +194,7 @@ public:
         *mNextSlot = run;
         mNextSlot = &run->nextRun;
 
-        run->font = new BTCB_Font(
+        run->font = new BTCB_GlyphFont(
             mContext, glyphRun->fontFace, glyphRun->fontEmSize);
         run->glyphCount = glyphRun->glyphCount;
 
@@ -318,7 +319,7 @@ BTCB_GlyphRun* btcb_get_next_run(
     return run->nextRun ? (BTCB_GlyphRun*)run->nextRun->glyphs : NULL;
 }
 
-BTCB_Font* btcb_get_run_font(
+BTCB_GlyphFont* btcb_get_run_font(
     BTCB_GlyphRun* runExt)
 {
     BaxterGlyphRun* run = BaxterGlyphRun::fromExt(runExt);
@@ -326,7 +327,7 @@ BTCB_Font* btcb_get_run_font(
 }
 
 void btcb_get_glyph_metrics(
-    BTCB_Font* font,
+    BTCB_GlyphFont* font,
     int glyph,
     BTCB_GlyphMetrics* out)
 {
@@ -343,8 +344,8 @@ void btcb_get_glyph_metrics(
         metrics.topSideBearing - metrics.bottomSideBearing) * scale;
 }
 
-void btcb_free_font(
-    BTCB_Font* font)
+void btcb_free_glyph_font(
+    BTCB_GlyphFont* font)
 {
     delete font;
 }

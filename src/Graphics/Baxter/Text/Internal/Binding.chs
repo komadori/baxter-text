@@ -131,17 +131,17 @@ getGlyphRunVector run@(BTCBGlyphRun runPtr) = do
     len <- btcbGetRunLength run
     V.unsafeFreeze $ MVector len (castForeignPtr runPtr)
 
-{#pointer *BTCB_Font as ^ foreign newtype #}
+{#pointer *BTCB_GlyphFont as ^ foreign newtype #}
 
-foreign import ccall "btcb.h &btcb_free_font"
-    btcbFreeFont :: FunPtr (Ptr BTCBFont -> IO ())
+foreign import ccall "btcb.h &btcb_free_glyph_font"
+    btcbFreeGlyphFont :: FunPtr (Ptr BTCBGlyphFont -> IO ())
 
-newFont :: Ptr BTCBFont -> IO BTCBFont
-newFont = fmap BTCBFont . newForeignPtr btcbFreeFont 
+newFont :: Ptr BTCBGlyphFont -> IO BTCBGlyphFont
+newFont = fmap BTCBGlyphFont . newForeignPtr btcbFreeGlyphFont 
 
 {#fun btcb_get_run_font as ^
     {withBTCBGlyphRun* `BTCBGlyphRun'} ->
-    `BTCBFont' newFont* #}
+    `BTCBGlyphFont' newFont* #}
 
 data GlyphMetrics = GlyphMetrics {
     glyphWidth  :: !Double,
@@ -159,12 +159,12 @@ instance Storable GlyphMetrics where
         {#set BTCB_GlyphMetrics.height #} ptr (realToFrac $ glyphHeight val)
 
 {#fun btcb_get_glyph_metrics as ^
-    {withBTCBFont* `BTCBFont',
+    {withBTCBGlyphFont* `BTCBGlyphFont',
      unGlyphID `GlyphID',
      castPtr `Ptr GlyphMetrics'} ->
     `()' #}
 
-getMetricsImpl :: BTCBFont -> GlyphID -> IO GlyphMetrics
+getMetricsImpl :: BTCBGlyphFont -> GlyphID -> IO GlyphMetrics
 getMetricsImpl font glyph =
     alloca $ \ptr -> do
         btcbGetGlyphMetrics font glyph ptr

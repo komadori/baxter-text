@@ -70,14 +70,14 @@ void btcb_free_font_desc(BTCB_FontDesc* fd)
     }
 }
 
-struct BTCB_FontImpl {
+struct BTCB_GlyphFontImpl {
     BTCB_FontDesc* context;
     PangoFont* font;
 };
 
 struct BaxterGlyphRunImpl {
     struct BaxterGlyphRunImpl* next_run;
-    BTCB_Font* font;
+    BTCB_GlyphFont* font;
     int glyph_count;
     BTCB_Glyph glyphs[];
 };
@@ -121,7 +121,7 @@ static void baxter_pango_draw_glyphs(
 
     g_atomic_int_inc(&rend->context->ref_count);
     g_object_ref(font);
-    run->font = calloc(1, sizeof(BTCB_Font));
+    run->font = calloc(1, sizeof(BTCB_GlyphFont));
     run->font->context = rend->context;
     run->font->font = font;
 
@@ -181,7 +181,7 @@ BTCB_GlyphRun* btcb_get_next_run(
     return run->next_run ? (BTCB_GlyphRun*)run->next_run->glyphs : NULL;
 }
 
-BTCB_Font* btcb_get_run_font(
+BTCB_GlyphFont* btcb_get_run_font(
     BTCB_GlyphRun* run_ext)
 {
     BaxterGlyphRun* run = FROM_BTCB_GLYPH_RUN(run_ext);
@@ -189,7 +189,7 @@ BTCB_Font* btcb_get_run_font(
 }
 
 void btcb_get_glyph_metrics(
-    BTCB_Font* font,
+    BTCB_GlyphFont* font,
     int glyph,
     BTCB_GlyphMetrics* out)
 {
@@ -201,8 +201,8 @@ void btcb_get_glyph_metrics(
     pango_fc_font_unlock_face((PangoFcFont*)font->font);
 }
 
-void btcb_free_font(
-    BTCB_Font* font)
+void btcb_free_glyph_font(
+    BTCB_GlyphFont* font)
 {
     g_object_unref(font->font);
     btcb_free_font_desc(font->context);
