@@ -170,6 +170,15 @@ getMetricsImpl font glyph =
         btcbGetGlyphMetrics font glyph ptr
         peek ptr
 
+{#fun btcb_render_glyph as ^
+    {withBTCBGlyphFont* `BTCBGlyphFont',
+     unGlyphID `GlyphID',
+     castPtr `Ptr Word8',
+     fromIntegral `CInt',
+     fromIntegral `CInt',
+     fromIntegral `CInt'} ->
+    `()' #}
+
 {#fun btcb_get_next_run as ^
     {withBTCBGlyphRun* `BTCBGlyphRun'} ->
     `Maybe BTCBGlyphRun' newMaybeGlyphRun* #}

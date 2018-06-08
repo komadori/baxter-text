@@ -16,3 +16,9 @@ createFont :: FontDesc -> FontHandle
 createFont fd = unsafePerformIO $ do
     hndl <- btcbCreateFontDesc (fontFamilies fd) (fontSize fd)
     return $ FontHandle hndl
+
+newtype GlyphFont = GlyphFont BTCBGlyphFont
+
+instance Show GlyphFont where
+    showsPrec _ (GlyphFont _) = showString "Font"
+

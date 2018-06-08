@@ -17,11 +17,6 @@ import Data.Vector.Storable (Vector)
 import Graphics.Baxter.Text.Internal.Binding
 import Graphics.Baxter.Text.Font
 
-newtype GlyphFont = GlyphFont BTCBGlyphFont
-
-instance Show GlyphFont where
-    showsPrec _ (GlyphFont _) = showString "Font"
-
 data GlyphRun = GlyphRun {
     runFont   :: GlyphFont,
     runGlyphs :: Vector GlyphInfo

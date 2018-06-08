@@ -53,6 +53,14 @@ extern void btcb_get_glyph_metrics(
     int glyph,
     BTCB_GlyphMetrics* out);
 
+extern void btcb_render_glyph(
+    BTCB_GlyphFont* font,
+    int glyph,
+    unsigned char* buffer,
+    int width,
+    int height,
+    int stride);
+
 extern void btcb_free_glyph_font(
     BTCB_GlyphFont* font);
 

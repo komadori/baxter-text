@@ -201,6 +201,33 @@ void btcb_get_glyph_metrics(
     pango_fc_font_unlock_face((PangoFcFont*)font->font);
 }
 
+extern void btcb_render_glyph(
+    BTCB_GlyphFont* font,
+    int glyph,
+    unsigned char* buffer,
+    int width,
+    int height,
+    int stride)
+{
+    FT_Face face = pango_fc_font_lock_face((PangoFcFont*)font->font);
+    FT_Load_Glyph(face, glyph, FT_LOAD_RENDER);
+    FT_Bitmap* bmap = &face->glyph->bitmap;
+    int min_width = width < bmap->width ? width : bmap->width;
+    int min_height = height < bmap->rows ? height : bmap->rows;
+    int src_skip = bmap->pitch - min_width;
+    int dst_skip = stride - min_width;
+    unsigned char* src_p = bmap->buffer;
+    unsigned char* dst_p = buffer;
+    for (int x=0; x<min_width; x++) {
+        for (int y=0; y<min_height; y++) {
+            *dst_p++ = *src_p++;
+        }
+        src_p += src_skip;
+        dst_p += dst_skip;
+    }
+    pango_fc_font_unlock_face((PangoFcFont*)font->font);
+}
+
 void btcb_free_glyph_font(
     BTCB_GlyphFont* font)
 {

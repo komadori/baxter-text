@@ -19,6 +19,7 @@ library
   exposed-modules:
     Graphics.Baxter.Text.Font
     Graphics.Baxter.Text.Layout
+    Graphics.Baxter.Text.Render
   other-modules:
     Graphics.Baxter.Text.Internal.Binding
   build-depends:
