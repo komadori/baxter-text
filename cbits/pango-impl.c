@@ -218,8 +218,8 @@ extern void btcb_render_glyph(
     int dst_skip = stride - min_width;
     unsigned char* src_p = bmap->buffer;
     unsigned char* dst_p = buffer;
-    for (int x=0; x<min_width; x++) {
-        for (int y=0; y<min_height; y++) {
+    for (int y=0; y<min_height; y++) {
+        for (int x=0; x<min_width; x++) {
             *dst_p++ = *src_p++;
         }
         src_p += src_skip;
