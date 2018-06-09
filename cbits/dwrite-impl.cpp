@@ -1,11 +1,17 @@
 #define VC_EXTRALEAN
+#define INITGUID
 #include <windows.h>
+#include <wincodec.h>
+#include <d2d1.h>
 #include <dwrite.h>
 #include <cassert>
 #include <cstdlib>
 #include <memory>
 
 #include "btcb.h"
+
+DEFINE_GUID(GUID_WICPixelFormat8bppAlpha,
+   0xe6cd0116, 0xeeba, 0x4161, 0xaa, 0x85, 0x27, 0xdd, 0x9f, 0xb3, 0xa8, 0x95);
 
 struct COMDeleter {
     template<typename T> void operator()(T* ptr) {
@@ -64,6 +70,55 @@ struct BTCB_FontDescImpl {
             &format);
         assert (SUCCEEDED(hr));
         mFormat.reset(format);
+
+        // Create WIC factory
+        IWICImagingFactory* wicFactory;
+        CoInitializeEx(NULL, COINIT_MULTITHREADED);
+        hr = CoCreateInstance(
+            CLSID_WICImagingFactory,
+            NULL,
+            CLSCTX_INPROC_SERVER,
+            IID_IWICImagingFactory,
+            (LPVOID*)&wicFactory);
+        assert (SUCCEEDED(hr));
+        mWicFactory.reset(wicFactory);
+
+        // Create WIC bitmap
+        IWICBitmap* wicBitmap;
+        hr = wicFactory->CreateBitmap(
+            (int)size, (int)size,
+            GUID_WICPixelFormat8bppAlpha,
+            WICBitmapCacheOnDemand,
+            &wicBitmap);
+        assert (SUCCEEDED(hr));
+        mWicBitmap.reset(wicBitmap);
+
+        // Create D2D factory
+        ID2D1Factory* d2dFactory;
+        hr = D2D1CreateFactory(
+            D2D1_FACTORY_TYPE_MULTI_THREADED,
+            &d2dFactory);
+        assert (SUCCEEDED(hr));
+        mD2dFactory.reset(d2dFactory);
+
+        // Create D2D render target
+        ID2D1RenderTarget* d2dTarget;
+        D2D1_RENDER_TARGET_PROPERTIES targetProps =
+            D2D1::RenderTargetProperties();
+        targetProps.pixelFormat =
+            D2D1::PixelFormat(DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_STRAIGHT);
+        hr = d2dFactory->CreateWicBitmapRenderTarget(
+            wicBitmap,
+            targetProps,
+            &d2dTarget);
+        assert (SUCCEEDED(hr));
+        mD2dTarget.reset(d2dTarget);
+
+        // Create D2D white brush
+        ID2D1SolidColorBrush* d2dBrush;
+        hr = d2dTarget->CreateSolidColorBrush({1,1,1,1}, &d2dBrush);
+        assert (SUCCEEDED(hr));
+        mD2dBrush.reset(d2dBrush);
     }
 
     void AddRef() {
@@ -80,6 +135,11 @@ struct BTCB_FontDescImpl {
     std::unique_ptr<IDWriteFactory, COMDeleter> mFactory;
     std::unique_ptr<IDWriteFontCollection, COMDeleter> mFontSet;
     std::unique_ptr<IDWriteTextFormat, COMDeleter> mFormat;
+    std::unique_ptr<IWICImagingFactory, COMDeleter> mWicFactory;
+    std::unique_ptr<IWICBitmap, COMDeleter> mWicBitmap;
+    std::unique_ptr<ID2D1Factory, COMDeleter> mD2dFactory;
+    std::unique_ptr<ID2D1RenderTarget, COMDeleter> mD2dTarget;
+    std::unique_ptr<ID2D1Brush, COMDeleter> mD2dBrush;
 };
 
 BTCB_FontDesc* btcb_create_font_desc(
@@ -352,7 +412,37 @@ void btcb_render_glyph(
     int height,
     int stride)
 {
-    assert (0);
+    UINT16 glyphIndex = static_cast<UINT16>(glyph);
+    DWRITE_GLYPH_METRICS metrics;
+    HRESULT hr = font->mFont->GetDesignGlyphMetrics(
+        &glyphIndex, 1, &metrics);
+    assert (SUCCEEDED(hr));
+
+    D2D1_POINT_2F point = {0, height};
+    DWRITE_GLYPH_RUN run;
+    run.fontFace = font->mFont.get();
+    run.fontEmSize = font->mSize;
+    run.glyphCount = 1;
+    run.glyphIndices = &glyphIndex;
+    FLOAT glyphAdvance = 0.0;
+    run.glyphAdvances = &glyphAdvance;
+    double scale = font->mSize / font->mMetrics.designUnitsPerEm;
+    DWRITE_GLYPH_OFFSET glyphOffset =
+        {-(int)(scale*metrics.leftSideBearing), 0};
+    run.glyphOffsets = &glyphOffset;
+    run.isSideways = false;
+    run.bidiLevel = 0;
+
+    font->mContext->mD2dTarget->BeginDraw();
+    font->mContext->mD2dTarget->DrawGlyphRun(
+        point, &run, font->mContext->mD2dBrush.get());
+    hr = font->mContext->mD2dTarget->EndDraw();
+    assert (SUCCEEDED(hr));
+
+    WICRect rect = {0, 0, width, height};
+    hr = font->mContext->mWicBitmap->CopyPixels(
+        &rect, stride, stride*height, buffer);
+    assert (SUCCEEDED(hr));
 }
 
 void btcb_free_glyph_font(

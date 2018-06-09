@@ -34,7 +34,7 @@ library
   if os(windows) && !flag(UsePango)
     c-sources: cbits/dwrite-impl.cpp
     cc-options: -std=c++11 -DBTCB_WIDE_CHARS
-    extra-libraries: dwrite, stdc++
+    extra-libraries: dwrite, d2d1, ole32, stdc++
   else
       if os(darwin) && !flag(UsePango)
         c-sources: cbits/coretext-impl.m
