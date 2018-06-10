@@ -13,6 +13,75 @@
 DEFINE_GUID(GUID_WICPixelFormat8bppAlpha,
    0xe6cd0116, 0xeeba, 0x4161, 0xaa, 0x85, 0x27, 0xdd, 0x9f, 0xb3, 0xa8, 0x95);
 
+struct COMApartment {
+    COMApartment() : mSetup(false) {}
+    void setup() {
+        if (!mSetup) {
+            HRESULT hr = CoInitializeEx(
+                NULL, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
+            assert (SUCCEEDED(hr));
+            mSetup = true;
+        }
+    }
+    ~COMApartment() {
+        if (mSetup) {
+            CoUninitialize();
+        }
+    }
+private:
+    bool mSetup;
+};
+
+static thread_local COMApartment gCom; 
+
+DWORD COMKeepAliveThreadProc(LPVOID param)
+{
+    HANDLE sem = (HANDLE)param;
+    gCom.setup();
+    BOOL ok = ReleaseSemaphore(sem, 1, NULL);
+    assert (ok);
+    // Wait for the keep alive manager to release this thread
+    WaitForSingleObject(sem, INFINITE);
+    CloseHandle(sem);
+    return 0;
+}
+
+// COM must remain initialised on at least one thread until all COM objects
+// have been released
+class COMKeepAliveManager {
+public:
+    COMKeepAliveManager()
+        : mRefCount(0), mSem(NULL) { }
+    void acquire() {
+        if (1 == InterlockedIncrement(&mRefCount)) {
+            mSem = CreateSemaphore(NULL, 0, 1, NULL);
+            HANDLE thr = CreateThread(
+                NULL, 0, COMKeepAliveThreadProc, (LPVOID)mSem, 0, NULL);
+            assert (thr);
+            // Wait for keep alive thread to initialise COM
+            DWORD wait = WaitForSingleObject(mSem, INFINITE);
+            assert (WAIT_OBJECT_0 == wait);
+        }
+    }
+    void release() {
+        HANDLE oldSem = mSem;
+        if (0 == InterlockedDecrement(&mRefCount)) {
+            BOOL ok = ReleaseSemaphore(oldSem, 1, NULL);
+            assert (ok);
+        }
+    }
+private:
+    unsigned long mRefCount;
+    HANDLE mSem;
+};
+
+static COMKeepAliveManager gComKeepAlive;
+
+struct COMKeepAlive {
+    COMKeepAlive() { gComKeepAlive.acquire(); }
+    ~COMKeepAlive() { gComKeepAlive.release(); }
+};
+
 struct COMDeleter {
     template<typename T> void operator()(T* ptr) {
         ptr->Release();
@@ -73,7 +142,6 @@ struct BTCB_FontDescImpl {
 
         // Create WIC factory
         IWICImagingFactory* wicFactory;
-        CoInitializeEx(NULL, COINIT_MULTITHREADED);
         hr = CoCreateInstance(
             CLSID_WICImagingFactory,
             NULL,
@@ -132,6 +200,7 @@ struct BTCB_FontDescImpl {
     }
 
     unsigned long mRefCount;
+    COMKeepAlive comKeepAlive;
     std::unique_ptr<IDWriteFactory, COMDeleter> mFactory;
     std::unique_ptr<IDWriteFontCollection, COMDeleter> mFontSet;
     std::unique_ptr<IDWriteTextFormat, COMDeleter> mFormat;
@@ -151,6 +220,7 @@ BTCB_FontDesc* btcb_create_font_desc(
 
 void btcb_free_font_desc(BTCB_FontDesc* fd)
 {
+    gCom.setup();
     fd->Release();
 }
 
@@ -433,6 +503,7 @@ void btcb_render_glyph(
     run.isSideways = false;
     run.bidiLevel = 0;
 
+    gCom.setup();
     font->mContext->mD2dTarget->BeginDraw();
     font->mContext->mD2dTarget->DrawGlyphRun(
         point, &run, font->mContext->mD2dBrush.get());
